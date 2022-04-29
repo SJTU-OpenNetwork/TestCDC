@@ -42,9 +42,10 @@ func diff(file1 string, file2 string) {
     defer fi2.Close()
 
     newHram := func(r io.Reader) chunker.Splitter {
-        // return chunker.NewHram(r, 256, 1024, 2048, 8)
-        // return chunker.NewRabin(r, 16384)
-        return chunker.NewRam(r, 512, 4096, 4)
+        // return chunker.NewFastCDC(r, 1024, 2048, 4096)
+        return chunker.NewHram(r, 256, 1024, 2048, 8)
+        // return chunker.NewRabin(r, 1024)
+        // return chunker.NewRam(r, 512, 4096, 4)
     }
 
     s1 := newHram(bufio.NewReader(fi1))
