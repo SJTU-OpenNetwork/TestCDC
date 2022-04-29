@@ -6,6 +6,7 @@ import (
     "io"
     "bufio"
     "time"
+    "strconv"
     chunker "github.com/SJTU-OpenNetwork/go-ipfs-chunker"
     blocks "github.com/ipfs/go-block-format"
 )
@@ -32,7 +33,7 @@ func chunkData(s chunker.Splitter) (map[string]blocks.Block, error) {
 }
 
 
-func diff(file1 string, file2 string) {
+func diff(file1 string, file2 string, alg string, min int, avg int, max int) {
     fi1,err := os.Open(file1)
     if err != nil{panic(err)}
     defer fi1.Close()
@@ -41,15 +42,32 @@ func diff(file1 string, file2 string) {
     if err != nil{panic(err)}
     defer fi2.Close()
 
-    newHram := func(r io.Reader) chunker.Splitter {
-        // return chunker.NewFastCDC(r, 1024, 2048, 4096)
-        return chunker.NewHram(r, 256, 1024, 2048, 8)
-        // return chunker.NewRabin(r, 1024)
-        // return chunker.NewRam(r, 512, 4096, 4)
+
+    var newCDC func(r io.Reader) chunker.Splitter
+
+    switch alg{
+    case "HRAM":
+        newCDC = func(r io.Reader) chunker.Splitter {
+            return chunker.NewHram(r, min, avg, max, 8)
+        }
+    case "FastCDC":
+        newCDC = func(r io.Reader) chunker.Splitter {
+            return chunker.NewFastCDC(r, uint64(min), uint64(avg), uint64(max))
+        }
+    case "Rabin":
+        newCDC = func(r io.Reader) chunker.Splitter {
+            return chunker.NewRabin(r, uint64(avg))
+        }
+    case "RAM":
+        newCDC = func(r io.Reader) chunker.Splitter {
+            return chunker.NewRam(r, min, max, 4)
+        }
+    default:
+        return
     }
 
-    s1 := newHram(bufio.NewReader(fi1))
-    s2 := newHram(bufio.NewReader(fi2))
+    s1 := newCDC(bufio.NewReader(fi1))
+    s2 := newCDC(bufio.NewReader(fi2))
 
     start := time.Now()
     blk1,_ := chunkData(s1)
@@ -83,26 +101,32 @@ func diff(file1 string, file2 string) {
 }
 
 func printHelp() {
-    fmt.Println("USAGE: ./main diff file1 file2")
+    fmt.Println("USAGE: ./main file1 file2 algorithm args(min/avg/max)")
 }
 
 
 func main() {
 
-    if len(os.Args) < 3 {
+    if len(os.Args) != 7 {
         printHelp()
         return
     }
 
-    switch os.Args[1] {
-    case "diff":
-        if len(os.Args) != 4 {
-            printHelp()
-        }
-        
-        diff(os.Args[2], os.Args[3])
-    default:
-        printHelp()
-    
+    min, err := strconv.Atoi(os.Args[4])
+	if err != nil{
+		panic(err)
     }
+
+    avg, err := strconv.Atoi(os.Args[5])
+	if err != nil{
+		panic(err)
+    }
+
+    max, err := strconv.Atoi(os.Args[6])
+	if err != nil{
+		panic(err)
+    }
+
+
+    diff(os.Args[1], os.Args[2], os.Args[3], min, avg, max)
 }
